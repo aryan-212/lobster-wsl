@@ -112,7 +112,7 @@ trap cleanup EXIT INT TERM
         [ -z "$base" ] && base="flixhq.to"
         [ -z "$player" ] && player="mpv.exe"
         [ -z "$download_dir" ] && download_dir="$PWD"
-        [ -z "$provider" ] && provider="UpCloud"
+        [ -z "$provider" ] && provider="Vidcloud"
         [ -z "$history" ] && history=0
         [ -z "$subs_language" ] && subs_language="english"
         subs_language="$(printf "%s" "$subs_language" | cut -c2-)"
