@@ -97,7 +97,7 @@ trap cleanup EXIT INT TERM
             command -v "$dep" >/dev/null || exit 1
         done
     }
-    dep_ch "grep" "$sed" "curl" "fzf" "mpv" || true
+    dep_ch "grep" "$sed" "curl" "fzf" "mpv.exe" || true
     if [ "$use_external_menu" = "1" ]; then
         dep_ch "rofi" || true
     fi
@@ -110,7 +110,7 @@ trap cleanup EXIT INT TERM
         #shellcheck disable=1090
         [ -f "$config_file" ] && . "${config_file}"
         [ -z "$base" ] && base="flixhq.to"
-        [ -z "$player" ] && player="mpv"
+        [ -z "$player" ] && player="mpv.exe"
         [ -z "$download_dir" ] && download_dir="$PWD"
         [ -z "$provider" ] && provider="UpCloud"
         [ -z "$history" ] && history=0
@@ -199,7 +199,7 @@ EOF
     -q, --quality
       Specify the video quality (if no quality is provided, it defaults to 1080)
     --quiet
-      Suppress the output from mpv when playing a video
+      Suppress the output from mpv.exe when playing a video
     -r, --recent [movies|tv]
       Lets you select from the most recent movies or tv shows (if no argument is provided, it defaults to movies)
     -s, --syncplay
@@ -412,30 +412,30 @@ EOF
         case $player in
             iina | celluloid)
                 if [ -n "$subs_links" ]; then
-                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv-sub-files="$subs_links" --mpv-force-media-title="$displayed_title" "$video_link"
-                    [ "$player" = "celluloid" ] && celluloid --mpv-sub-files="$subs_links" --mpv-force-media-title="$displayed_title" "$video_link" 2>/dev/null
+                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv.exe-sub-files="$subs_links" --mpv.exe-force-media-title="$displayed_title" "$video_link"
+                    [ "$player" = "celluloid" ] && celluloid --mpv.exe-sub-files="$subs_links" --mpv.exe-force-media-title="$displayed_title" "$video_link" 2>/dev/null
                 else
-                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv-force-media-title="$displayed_title" "$video_link"
-                    [ "$player" = "celluloid" ] && celluloid --mpv-force-media-title="$displayed_title" "$video_link" 2>/dev/null
+                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv.exe-force-media-title="$displayed_title" "$video_link"
+                    [ "$player" = "celluloid" ] && celluloid --mpv.exe-force-media-title="$displayed_title" "$video_link" 2>/dev/null
                 fi
                 ;;
             vlc)
                 vlc "$video_link" --meta-title "$displayed_title"
                 ;;
-            mpv | mpv.exe)
+            mpv.exe)
                 [ -z "$continue_choice" ] && check_history
                 if [ "$history" = 1 ]; then
                     if [ -n "$subs_links" ]; then
                         if [ -n "$resume_from" ]; then
-                            $player --start="$resume_from" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            mpv.exe --start="$resume_from" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         else
-                            $player --sub-file="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            mpv.exe --sub-file="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         fi
                     else
                         if [ -n "$resume_from" ]; then
-                            $player --start="$resume_from" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         else
-                            $player --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            mpv.exe --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         fi
                     fi
 
@@ -446,19 +446,19 @@ EOF
                 else
                     if [ -n "$subs_links" ]; then
                         if [ "$quiet_output" = 1 ]; then
-                            [ -z "$resume_from" ] && $player "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
-                            [ -n "$resume_from" ] && $player "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -z "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -n "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
                         else
-                            [ -z "$resume_from" ] && $player "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link"
-                            [ -n "$resume_from" ] && $player "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
+                            [ -z "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link"
+                            [ -n "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
                         fi
                     else
                         if [ "$quiet_output" = 1 ]; then
-                            [ -z "$resume_from" ] && $player --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
-                            [ -n "$resume_from" ] && $player --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -z "$resume_from" ] && mpv.exe --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -n "$resume_from" ] && mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
                         else
-                            [ -z "$resume_from" ] && $player --force-media-title="$displayed_title" "$video_link"
-                            [ -n "$resume_from" ] && $player --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
+                            [ -z "$resume_from" ] && mpv.exe --force-media-title="$displayed_title" "$video_link"
+                            [ -n "$resume_from" ] && mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
                         fi
                     fi
                 fi
