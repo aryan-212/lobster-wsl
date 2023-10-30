@@ -113,7 +113,7 @@ trap cleanup EXIT INT TERM
         [ -z "$player" ] && player="mpv.exe"
         [ -z "$download_dir" ] && download_dir="$PWD"
         [ -z "$provider" ] && provider="Vidcloud"
-        [ -z "$history" ] && history=0
+        [ -z "$history" ] && history=1
         [ -z "$subs_language" ] && subs_language="english"
         subs_language="$(printf "%s" "$subs_language" | cut -c2-)"
         [ -z "$histfile" ] && histfile="$data_dir/lobster_history.txt" && mkdir -p "$(dirname "$histfile")"
