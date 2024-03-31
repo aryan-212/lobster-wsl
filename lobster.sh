@@ -1,6 +1,6 @@
 #!/bin/sh
 
-LOBSTER_VERSION="4.2.1"
+LOBSTER_VERSION="4.2.4"
 
 config_file="$HOME/.config/lobster/lobster_config.txt"
 lobster_editor=${VISUAL:-${EDITOR}}
@@ -69,7 +69,7 @@ trap cleanup EXIT INT TERM
     tmp_position="/tmp/lobster_position"
     case "$(uname -s)" in
         MINGW* | *Msys) separator=';' && path_thing='' && sed="sed" ;;
-        *arwin) sed="gsed" ;;
+        *arwin) separator=':' && path_thing="\\" && sed="gsed" ;;
         *) separator=':' && path_thing="\\" && sed="sed" ;;
     esac
 
@@ -97,7 +97,7 @@ trap cleanup EXIT INT TERM
             command -v "$dep" >/dev/null || exit 1
         done
     }
-    dep_ch "grep" "$sed" "curl" "fzf" "mpv.exe" || true
+    dep_ch "grep" "$sed" "curl" "fzf" || true
     if [ "$use_external_menu" = "1" ]; then
         dep_ch "rofi" || true
     fi
@@ -110,7 +110,7 @@ trap cleanup EXIT INT TERM
         #shellcheck disable=1090
         [ -f "$config_file" ] && . "${config_file}"
         [ -z "$base" ] && base="flixhq.to"
-        [ -z "$player" ] && player="mpv.exe"
+        [ -z "$player" ] && player="mpv"
         [ -z "$download_dir" ] && download_dir="$PWD"
         [ -z "$provider" ] && provider="UpCloud"
         [ -z "$history" ] && history=0
@@ -199,7 +199,7 @@ EOF
     -q, --quality
       Specify the video quality (if no quality is provided, it defaults to 1080)
     --quiet
-      Suppress the output from mpv.exe when playing a video
+      Suppress the output from mpv when playing a video
     -r, --recent [movies|tv]
       Lets you select from the most recent movies or tv shows (if no argument is provided, it defaults to movies)
     -s, --syncplay
@@ -321,48 +321,16 @@ EOF
     }
 
     extract_from_json() {
-        json_key="file"
-        encrypted=$(printf "%s" "$json_data" | tr "{}" "\n" | $sed -nE "s_.*\"${json_key}\":\"([^\"]*)\".*_\1_p" | grep "\.m3u8")
-        if [ -n "$encrypted" ]; then
-            video_link=$(printf "%s" "$json_data" | tr "{|}" "\n" | $sed -nE "s_.*\"${json_key}\":\"([^\"]*)\".*_\1_p" | head -1)
-        else
-            json_key="sources"
-            encrypted=$(printf "%s" "$json_data" | tr "{}" "\n" | $sed -nE "s_.*\"${json_key}\":\"([^\"]*)\".*_\1_p")
-
-						enikey=$(curl -s "http://zoro-keys.freeddns.org/keys/e${embed_type}/key.txt" | tr -d ' ' |
-                $sed 's/\[\([0-9]*\),\([0-9]*\)\]/\1-\2/g;s/\[//g;s/\]//g;s/,/ /g')
-            encrypted_video_link=$(printf "%s" "$json_data" | tr "{|}" "\n" | $sed -nE "s_.*\"sources\":\"([^\"]*)\".*_\1_p" | head -1)
-
-            final_key=""
-            tmp_encrypted_video_link="$encrypted_video_link"
-            for key in $enikey; do
-                start="${key%-*}"
-                start=$((start + 1))
-                end="${key#*-}"
-                key=$(printf "%s" "$encrypted_video_link" | cut -c"$start-$end")
-                final_key="$final_key$key"
-                tmp_encrypted_video_link=$(printf "%s" "$tmp_encrypted_video_link" | $sed "s@$key@@g")
-            done
-
-            # ty @CoolnsX for helping me with figuring out how to implement aes in openssl
-            video_link=$(printf "%s" "$tmp_encrypted_video_link" | base64 -d |
-                openssl enc -aes-256-cbc -d -md md5 -k "$final_key" 2>/dev/null | $sed -nE "s_.*\"file\":\"([^\"]*)\".*_\1_p")
-
-            json_data=$(printf "%s" "$json_data" | $sed -e "s|${encrypted_video_link}|${video_link}|")
-        fi
+        video_link=$(printf "%s" "$json_data" | tr '[' '\n' | $sed -nE 's@.*\\\"file\\\":\\\"(.*\.m3u8).*@\1@p' | head -1)
         [ -n "$quality" ] && video_link=$(printf "%s" "$video_link" | $sed -e "s|/playlist.m3u8|/$quality/index.m3u8|")
 
         [ "$json_output" = "1" ] && printf "%s\n" "$json_data" && exit 0
-        case "$json_key" in
-            file) subs_links=$(printf "%s" "$json_data" | tr "{}" "\n" | $sed -nE "s@\"${json_key}\":\"([^\"]*)\",\"label\":\"(.$subs_language)[,\"\ ].*@\1@p") ;;
-            sources) subs_links=$(printf "%s" "$json_data" | tr "{}" "\n" | $sed -nE "s@.*\"file\":\"([^\"]*)\",\"label\":\"(.$subs_language)[,\"\ ].*@\1@p") ;;
-            *) subs_links="" ;;
-        esac
+        subs_links=$(printf "%s" "$json_data" | tr "{}" "\n" | $sed -nE "s@.*\"file\":\"([^\"]*)\",\"label\":\"(.$subs_language)[,\"\ ].*@\1@p")
         subs_arg="--sub-file"
         num_subs=$(printf "%s" "$subs_links" | wc -l)
         if [ "$num_subs" -gt 0 ]; then
             subs_links=$(printf "%s" "$subs_links" | $sed -e "s/:/\\$path_thing:/g" -e "H;1h;\$!d;x;y/\n/$separator/" -e "s/$separator\$//")
-            subs_arg="--sub-files"
+            [ "$num_subs" -gt 1 ] && subs_arg="--sub-files"
         fi
         [ -z "$subs_links" ] && send_notification "No subtitles found"
     }
@@ -373,7 +341,7 @@ EOF
         provider_link=$(printf "%s" "$parse_embed" | cut -f1)
         source_id=$(printf "%s" "$parse_embed" | cut -f3)
         embed_type=$(printf "%s" "$parse_embed" | cut -f2)
-        json_data=$(curl -s "${provider_link}/ajax/embed-${embed_type}/getSources?id=${source_id}" -H "X-Requested-With: XMLHttpRequest")
+        json_data=$(curl -s "https://api.fffapifree.cam/get-source?id=${source_id}")
         [ -n "$json_data" ] && extract_from_json
     }
 
@@ -412,30 +380,31 @@ EOF
         case $player in
             iina | celluloid)
                 if [ -n "$subs_links" ]; then
-                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv.exe-sub-files="$subs_links" --mpv.exe-force-media-title="$displayed_title" "$video_link"
-                    [ "$player" = "celluloid" ] && celluloid --mpv.exe-sub-files="$subs_links" --mpv.exe-force-media-title="$displayed_title" "$video_link" 2>/dev/null
+                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv-sub-files="$subs_links" --mpv-force-media-title="$displayed_title" "$video_link"
+                    [ "$player" = "celluloid" ] && celluloid --mpv-sub-files="$subs_links" --mpv-force-media-title="$displayed_title" "$video_link" 2>/dev/null
                 else
-                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv.exe-force-media-title="$displayed_title" "$video_link"
-                    [ "$player" = "celluloid" ] && celluloid --mpv.exe-force-media-title="$displayed_title" "$video_link" 2>/dev/null
+                    [ "$player" = "iina" ] && iina --no-stdin --keep-running --mpv-force-media-title="$displayed_title" "$video_link"
+                    [ "$player" = "celluloid" ] && celluloid --mpv-force-media-title="$displayed_title" "$video_link" 2>/dev/null
                 fi
                 ;;
             vlc)
-                vlc "$video_link" --meta-title "$displayed_title"
+                vlc_subs_links=$(printf "%s" "$subs_links" | sed 's/https\\:/https:/g; s/:\([^\/]\)/#\1/g')
+                vlc "$video_link" --meta-title "$displayed_title" --input-slave="$vlc_subs_links"
                 ;;
-            mpv.exe)
+            mpv | mpv.exe)
                 [ -z "$continue_choice" ] && check_history
                 if [ "$history" = 1 ]; then
                     if [ -n "$subs_links" ]; then
                         if [ -n "$resume_from" ]; then
-                            mpv.exe --start="$resume_from" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            "$player" --start="$resume_from" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         else
-                            mpv.exe --sub-file="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            "$player" --sub-file="$subs_links" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         fi
                     else
                         if [ -n "$resume_from" ]; then
-                            mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            "$player" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         else
-                            mpv.exe --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
+                            "$player" --force-media-title="$displayed_title" "$video_link" 2>&1 | tee "$tmp_position"
                         fi
                     fi
 
@@ -446,19 +415,19 @@ EOF
                 else
                     if [ -n "$subs_links" ]; then
                         if [ "$quiet_output" = 1 ]; then
-                            [ -z "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
-                            [ -n "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -z "$resume_from" ] && "$player" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -n "$resume_from" ] && "$player" "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
                         else
-                            [ -z "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link"
-                            [ -n "$resume_from" ] && mpv.exe "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
+                            [ -z "$resume_from" ] && "$player" "$subs_arg"="$subs_links" --force-media-title="$displayed_title" "$video_link"
+                            [ -n "$resume_from" ] && "$player" "$subs_arg"="$subs_links" --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
                         fi
                     else
                         if [ "$quiet_output" = 1 ]; then
-                            [ -z "$resume_from" ] && mpv.exe --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
-                            [ -n "$resume_from" ] && mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -z "$resume_from" ] && "$player" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
+                            [ -n "$resume_from" ] && "$player" --start="$resume_from" --force-media-title="$displayed_title" "$video_link" >/dev/null 2>&1
                         else
-                            [ -z "$resume_from" ] && mpv.exe --force-media-title="$displayed_title" "$video_link"
-                            [ -n "$resume_from" ] && mpv.exe --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
+                            [ -z "$resume_from" ] && "$player" --force-media-title="$displayed_title" "$video_link"
+                            [ -n "$resume_from" ] && "$player" --start="$resume_from" --force-media-title="$displayed_title" "$video_link"
                         fi
                     fi
                 fi
@@ -521,7 +490,8 @@ EOF
     }
 
     download_video() {
-        ffmpeg -loglevel error -stats -i "$1" -c copy "$3/$2".mp4
+        dir="$(printf "%s/%s" "$3" "$2" | tr -d ':')"
+        ffmpeg -loglevel error -stats -i "$1" -c copy "$dir.mp4"
     }
 
     loop() {
@@ -603,7 +573,7 @@ EOF
             download_thumbnails "$response" "3"
             select_desktop_entry ""
         else
-            [ "$use_external_menu" = "1" ] && choice=$(printf "%s" "$response" | rofi -dmenu -p "" -mesg "Choose a Movie or TV Show" -display-columns 1)
+            [ "$use_external_menu" = "1" ] && choice=$(printf "%s" "$response" | rofi -dmenu -i -p "" -mesg "Choose a Movie or TV Show" -display-columns 1)
             [ "$use_external_menu" = "0" ] && choice=$(printf "%s" "$response" | fzf --reverse --with-nth 1 -d "\t" --header "Choose a Movie or TV Show")
             title=$(printf "%s" "$choice" | $sed -nE "s@(.*) \((movie|tv)\).*@\1@p")
             media_type=$(printf "%s" "$choice" | $sed -nE "s@(.*) \((movie|tv)\).*@\2@p")
@@ -688,6 +658,16 @@ EOF
     }
 
     configuration
+
+    # Edge case for Windows, just exits with dep_ch's error message if it can't find mpv.exe either
+    if [ "$player" = "mpv" ] && ! command -v mpv >/dev/null; then
+        if command -v mpv.exe >/dev/null; then
+            player="mpv.exe"
+        else
+            dep_ch mpv.exe
+        fi
+    fi
+
     [ "$debug" = 1 ] && set -x
     query=""
     while [ $# -gt 0 ]; do
